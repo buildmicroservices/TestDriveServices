@@ -35,8 +35,8 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&userLicense, "license", "l", "", "Name of license for the project (can provide `licensetext` in config)")
 	rootCmd.PersistentFlags().Bool("viper", true, "Use Viper for configuration")
 
-	rootCmd.PersistentFlags().StringVar(&Host, "host", "local", "host name")
-	rootCmd.PersistentFlags().StringVar(&Port, "port", "80", "port name")
+	rootCmd.PersistentFlags().StringVar(&Host, "host", "localhost", "host name")
+	rootCmd.PersistentFlags().StringVar(&Port, "port", "8090", "port name")
 
 	viper.AutomaticEnv()
 	viper.BindPFlag("author", rootCmd.PersistentFlags().Lookup("author"))

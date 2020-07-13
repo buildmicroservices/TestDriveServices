@@ -5,3 +5,4 @@
 **/src/go.etcd.io
 **/src/gopkg.in
 **/src/vendor
+**/.idea
