@@ -19,7 +19,7 @@ func RunServer(server *http.Server) {
 	var router = initializeRouter()
 
 	server.Handler = router
-	
+
 	fmt.Println("fire up server ")
 	server.ReadTimeout, _ = time.ParseDuration("10s")
 	server.WriteTimeout, _ = time.ParseDuration("2m")

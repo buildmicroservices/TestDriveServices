@@ -17,16 +17,35 @@ type ErrorResponse struct {
 	ErrorDetail	[][]string	`json:"errorDetail"`
   }
 
-  
-// set standard response headers
-func setResponseHeaders(w http.ResponseWriter) {
-	w.Header().Set("content-type", "application/json")
-	var err error
-	uid := uuid.Must(uuid.New(), err).String()
-	w.Header().Set("X-serverCorrelation", uid)
+
+type HttpRecorder struct {
+	http.ResponseWriter
+	status int
+	errorResponse ErrorResponse
 }
 
+func NewHttpRecorder(w http.ResponseWriter) HttpRecorder {
+   return HttpRecorder { w , 0, ErrorResponse{} }
+}
 
+// set standard response headers
+func (rec *HttpRecorder )SetResponseHeaders() {
+	rec.ResponseWriter.Header().Set("content-type", "application/json")
+	var err error
+	uid := uuid.Must(uuid.New(), err).String()
+	rec.ResponseWriter.Header().Set("X-serverCorrelation", uid)
+}
+
+func (rec *HttpRecorder) WriteHeader(code int) {
+	rec.status = code
+	rec.ResponseWriter.WriteHeader(code)
+}
+
+//TODO: test log middleware
+
+//TODO: test timer middleware
+
+//TODO: add Prometheus metrics... in other file
 
 // Middleware handler to emit standard request logging information
 // Place in the chain AFTER security principle decoding
@@ -42,14 +61,21 @@ func loggingMiddleware(next http.Handler) httprouter.Handle {
 }
 
 func pushHandle (w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-  w.Write([]byte("Push"))
+	log.Println("in the push handler ")
+	rec := NewHttpRecorder(w)
+	rec.SetResponseHeaders()
+	rec.ResponseWriter.WriteHeader(201)
+	w.Write([]byte("{ method: pushHandler, time: 100, uri=\"/push\"}"))
 }
 
-func pullHandle(w http.ResponseWriter, r *http.Request, ps httprouter.Params) { 
-  w.Write([]byte("Pull"))
+func pullHandle(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.Println("in the pull handler ")
+
+	rec := NewHttpRecorder(w)
+	rec.SetResponseHeaders()
+	rec.ResponseWriter.WriteHeader(201)
+	w.Write([]byte("{ method: pullHandler, time: 100, uri=\"/pull\"}"))
 }
-
-
 
 /// STANDARD API RESULT FRAMEWORK
 
@@ -68,8 +94,6 @@ func pullHandle(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 //	w.WriteHeader(errorCode)
 //	json.NewEncoder(w).Encode(&JsonErrorResponse{Error: &ApiError{Status: errorCode, Title: errorMsg}})
 //}
-
-
 
 /// EXAMPLE ROUTE SETUP
 

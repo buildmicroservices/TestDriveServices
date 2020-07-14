@@ -22,40 +22,47 @@ type EchoResponseHTTP struct {
 	Body        string              `json:"httpBody"`
 }
 
+type Service interface {
+}
+
+
 // the global server context
 type echoSleepCtx struct {
-	ServiceName string
-	EchoSleepHandle http.Handler
+	ServiceName     string
+	// Note, handler chain could be a httprouter
+	EchoSleepHandleChain http.Handler
 }
 
 // per request context
 // Sleeper: propagate the sleep duration
 // Ctx: holds any service specific context
+// TimeSpan: trace and timer telemetry
 // EchoResponseHTTP: include response in the context object
 type requestCtx struct {
 	Sleeper          time.Duration
 	Ctx              echoSleepCtx
+	TimeSpan TimeSpanner
 	EchoResponseHTTP EchoResponseHTTP
 }
 
-type Service interface {
-}
+
 
 // standard interface to handle request
- func (ctx echoSleepCtx) ServeHTTP(w http.ResponseWriter, r *http.Request) {
- 	ctx.echoSleepHTTP(w,r)
- }
+func (ctx echoSleepCtx) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx.echoSleepHTTP(w, r)
+}
 
 // main HTTP Request Handler   format http.Handler
 func (ctx echoSleepCtx) echoSleepHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// trace level message
 	// log.Trace("{ message: \"received echo request\" } ")
-
+	externalId := r.Header.Get("externalId")
 	// establish per request context
 	requestCtx := &requestCtx{
 		Sleeper: getSleepDuration(r),
 		Ctx:     ctx,
+		TimeSpan: NewTimeSpanner(ctx.ServiceName+"-echo",externalId),
 		EchoResponseHTTP: EchoResponseHTTP{
 			Method:      r.Method,
 			Url:         r.URL,
@@ -82,7 +89,10 @@ func (ctx echoSleepCtx) echoSleepHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	setResponseHeaders(w)
+	// end of the line handler.... can start writing out
+	rec := NewHttpRecorder(w)
+	rec.SetResponseHeaders()
+	rec.ResponseWriter.WriteHeader(223)
 
 	b, err := json.Marshal(requestCtx.EchoResponseHTTP)
 	if err == nil {
@@ -92,7 +102,7 @@ func (ctx echoSleepCtx) echoSleepHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (ctx echoSleepCtx)echo1() http.Handler {
+func (ctx echoSleepCtx) echo1() http.Handler {
 	log.Println("{ service: \"" + ctx.ServiceName + "\", start: true, message:\"registering echo handler\"}")
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -101,13 +111,12 @@ func (ctx echoSleepCtx)echo1() http.Handler {
 	)
 }
 
-
-func initializeRouter( ) *httprouter.Router {
+func initializeRouter() *httprouter.Router {
 
 	// inject the service global context values
-	echoSleepCtx := &echoSleepCtx{ServiceName: "echoSleepHTTP" }
+	echoSleepCtx := &echoSleepCtx{ServiceName: "echoSleepHTTP"}
 
-	echoSleepCtx.EchoSleepHandle = echoSleepCtx.echo1()
+	echoSleepCtx.EchoSleepHandleChain = echoSleepCtx.echo1()
 
 	router := httprouter.New()
 
@@ -116,17 +125,18 @@ func initializeRouter( ) *httprouter.Router {
 	router.ServeFiles("/static/*filepath", http.Dir("/var/www/public/"))
 
 	// EStablish the echoSleep Handler off the root URI basepath
-	//var handle httprouter.Handle
+	var handle httprouter.Handle
 
 	//	router.Handle(route.Method, route.Path, handle)
 	// inject the logger BEFORE the echoSleepHTTP handler
-	//handle = loggingMiddleware(echo1)
+	handle = loggingMiddleware(echoSleepCtx.echo1())
+	router.GET("/echo1", handle)
+
 	//router.Handle("GET", "/{rest:.*}", handle)
-
 	//router.GET("/{rest:.*}", echoSleepCtx.echoSleepHTTP)
-
 	//router.PUT("/{rest:.*}", handle)
-	router.GET("/foo", StdToJulienMiddleware(echoSleepCtx.EchoSleepHandle))
+
+	router.GET("/echo", StdToJulienMiddleware(echoSleepCtx.EchoSleepHandleChain))
 
 	router.GET("/push", pushHandle)
 	router.GET("/pull", pullHandle)
@@ -149,5 +159,5 @@ func initializeRouter( ) *httprouter.Router {
 	// is called.
 	//	router.MethodNotAllowed = func() ()
 
-return router
+	return router
 }
