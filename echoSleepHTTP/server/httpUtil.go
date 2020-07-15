@@ -3,6 +3,7 @@ package server
 // @author: Chris Haddad
 
 import (
+	//"context"
 	"encoding/json"
 	"github.com/google/uuid"
 	"github.com/julienschmidt/httprouter"
@@ -54,6 +55,23 @@ type HttpCtx struct {
 }
 
 //TODO: add Prometheus metrics... in other file
+
+/// Middleware handler to inject our custom request context into the chain
+func settingsMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		//var s = "/var/bin"
+
+		ctx := r.Context()
+		//ctx = context.WithValue(ctx, "tradewindMiddlewareContext", s)
+		r = r.WithContext(ctx)
+		h.ServeHTTP(w, r)
+	})
+}
+
+// Example on how to retrieve our context
+// 	s, ok := r.Context().Value("tradewindMiddlewareContext").(HttpCtx)
+
+
 
 // Middleware handler to emit standard request logging information
 // Place in the chain AFTER security principle decoding
