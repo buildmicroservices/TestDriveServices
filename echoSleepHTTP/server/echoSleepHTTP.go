@@ -41,7 +41,7 @@ type echoSleepCtx struct {
 type requestCtx struct {
 	Sleeper          time.Duration
 	Ctx              echoSleepCtx
-	TimeSpan TimeSpanner
+	TimeSpan *TimeSpanner
 	EchoResponseHTTP EchoResponseHTTP
 }
 
@@ -56,7 +56,8 @@ func (ctx echoSleepCtx) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (ctx echoSleepCtx) echoSleepHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// trace level message
-	// log.Trace("{ message: \"received echo request\" } ")
+//	log.Trace("{ message: \"received echo request\" } ")
+	log.Println("{ message: \"received echo request\" } ")
 	externalId := r.Header.Get("externalId")
 	// establish per request context
 	requestCtx := &requestCtx{
@@ -124,21 +125,18 @@ func initializeRouter() *httprouter.Router {
 	//http.Handle("/static/", http.StripPrefix("/static/", fs))
 	router.ServeFiles("/static/*filepath", http.Dir("/var/www/public/"))
 
-	// EStablish the echoSleep Handler off the root URI basepath
+	// Establish the echoSleep Handler off the root URI basepath
 	var handle httprouter.Handle
 
-	//	router.Handle(route.Method, route.Path, handle)
-	// inject the logger BEFORE the echoSleepHTTP handler
-	handle = loggingMiddleware(echoSleepCtx.echo1())
+	var middlewareSetup http.Handler
+	middlewareSetup = traceMiddleware(loggingMiddleware(echoSleepCtx.echo1()))
+	handle = StdToJulienMiddleware(middlewareSetup)
 	router.GET("/echo1", handle)
-
-	//router.Handle("GET", "/{rest:.*}", handle)
-	//router.GET("/{rest:.*}", echoSleepCtx.echoSleepHTTP)
-	//router.PUT("/{rest:.*}", handle)
 
 	router.GET("/echo", StdToJulienMiddleware(echoSleepCtx.EchoSleepHandleChain))
 
 	router.GET("/push", pushHandle)
+	router.GET("/push/:chainId", pushHandle)
 	router.GET("/pull", pullHandle)
 
 	//http.Handle("/", router)
