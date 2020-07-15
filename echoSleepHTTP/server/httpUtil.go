@@ -1,4 +1,6 @@
 package server
+// HTTP Utilities
+// @author: Chris Haddad
 
 import (
 	"encoding/json"
@@ -6,7 +8,6 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"log"
 	"net/http"
-	//"time"
 )
 
 // Standard Error Response Object 
@@ -17,17 +18,20 @@ type ErrorResponse struct {
 	ErrorDetail  [][]string `json:"errorDetail"`
 }
 
+// HTTPRecorder structure to handle Response Writing and Response context
 type HttpRecorder struct {
 	http.ResponseWriter
 	status        int
 	errorResponse ErrorResponse
+	// add Body ?
 }
 
+// utility function to create a new HTTP recorder that wraps ResponseWriter
 func NewHttpRecorder(w http.ResponseWriter) HttpRecorder {
 	return HttpRecorder{w, 0, ErrorResponse{}}
 }
 
-// set standard response headers
+// Utility function to set standard response headers
 func (rec *HttpRecorder) SetResponseHeaders() {
 	rec.ResponseWriter.Header().Set("content-type", "application/json")
 	var err error
@@ -35,21 +39,19 @@ func (rec *HttpRecorder) SetResponseHeaders() {
 	rec.ResponseWriter.Header().Set("X-serverCorrelation", uid)
 }
 
+// Utility function to write out headers
 func (rec *HttpRecorder) WriteHeader(code int) {
 	rec.status = code
 	rec.ResponseWriter.WriteHeader(code)
 }
 
+//TODO: pass Http context structure down the middleware chain
 // standard HTTP middleware context - per request
 type HttpCtx struct {
 	ServiceName string
 	TimeSpanner TimeSpanner
 	Logger      log.Logger
 }
-
-//TODO: test log middleware
-
-//TODO: test timer middleware
 
 //TODO: add Prometheus metrics... in other file
 
@@ -66,6 +68,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// Span trace middleware, establish call chain and timings
 func traceMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -76,25 +79,19 @@ func traceMiddleware(next http.Handler) http.Handler {
 			timeSpan := NewTimeSpanner("echo", externalId)
 			span, _ := timeSpan.addTimeSpan("domainCall")
 
+			//TODO: pass the time spanner across sub-calls.
+
 			span.StartTimer()
 			next.ServeHTTP(w, r)
-		/*	duration, err1 := time.ParseDuration("2s")
-			if err1 == nil {
-				time.Sleep(duration)
-			}
-		*/
 			span.StopTimer()
-			log.Println("duration is "+span.GetDuration())
-	/*		b, err := json.Marshal(span)
-			if err == nil {
-				log.Println("span:" + string(b))
-			}
-*/
 
 			b, err := json.Marshal(timeSpan)
 				if err == nil {
 					log.Println("timespanner:"+string(b))
 				}
+
+				// TODO: emit the internal call timer to telemetry service
+				// TODO: add openTelemetry
 		}
 	})
 }

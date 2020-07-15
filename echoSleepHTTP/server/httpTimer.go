@@ -1,4 +1,6 @@
 package server
+// HTTP Trace and Timer library
+// @author: Chris Haddad
 
 import (
 	"github.com/google/uuid"
